@@ -1,0 +1,94 @@
+module o-ran-fm-ext {
+  yang-version 1.1;
+  namespace "urn:o-ran:fm-ext:1.0";
+  prefix "o-ran-fm-ext";
+
+  import o-ran-uplane-conf {
+    prefix "up";
+  }
+
+  organization "YADRO";
+
+  contact
+    "www.yadro.com";
+
+  description
+    "This module defines FM related extensions to the O-RAN
+     O-FH specification v. O-RAN-WG4.MP.0-v09.00.
+
+     Copyright 2023 YADRO;";
+
+  revision "2023-08-02" {
+    description
+      "version 0.0.1
+
+      1) Initial draft";
+  }
+
+  feature VSWR-HW-THR-REPORT {
+    description
+      "O-RU supports VSWR HW Thresholds reporting over M-plane.";
+  }
+
+  grouping antenna-port-group {
+    description "antenna-port-group";
+    leaf antenna-port-name {
+      type leafref {
+        path "/up:user-plane-configuration/up:tx-arrays/up:name";
+        require-instance false;
+      }
+      mandatory true;
+      description
+        "Contains the name of the antenna(RF) port at the O-RU.";
+    }
+  }
+
+  container vswr-threshold {
+    list vswr-sw-threshold-list {
+      key "antenna-port-name";
+      description
+        "VSWR software thresholds for different antenna ports";
+      uses antenna-port-group;
+
+      leaf minor-threshold {
+        type decimal64 {
+          fraction-digits 1;
+          range "1.5 .. 2.5";
+        }
+        default 1.5;
+        description
+          "a threshold, exceeding which VSWR alarm with minor severity is sent";
+      }
+      leaf major-threshold {
+        type decimal64 {
+          fraction-digits 1;
+          range "1.5 .. 2.5";
+        }
+        default 2.5;
+        description
+          "a threshold, exceeding which VSWR alarm with major severity is sent";
+      } 
+    }
+
+    list vswr-hw-threshold-list {
+      if-feature VSWR-HW-THR-REPORT;
+      config false;
+      key "antenna-port-name";
+      description
+        "VSWR hardware threshold for different antenna ports";
+
+      uses antenna-port-group;
+      
+      leaf hw-threshold {
+        type decimal64 {
+          fraction-digits 1;
+        }
+        description
+          "VSWR HW threshold";
+      }
+    }
+
+    description
+      "Lists of VSWR thresholds";
+  }
+}

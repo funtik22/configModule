@@ -1,0 +1,24 @@
+<user-plane-configuration xmlns="urn:o-ran:uplane-conf:1.0">
+    
+    <rx-array-carriers>
+    <name>carrier1</name>
+    <center-of-channel-bandwidth>3700000000</center-of-channel-bandwidth>
+    <channel-bandwidth>100000000</channel-bandwidth>
+    <downlink-radio-frame-offset>0</downlink-radio-frame-offset>
+    <downlink-sfn-offset>0</downlink-sfn-offset>
+    <n-ta-offset>25600</n-ta-offset>
+    <gain-correction>-2.3</gain-correction>
+    <active>INACTIVE</active>
+    </rx-array-carriers>
+
+    <tx-array-carriers>
+    <name>carrier1</name>
+    <center-of-channel-bandwidth>3700000000</center-of-channel-bandwidth>
+    <channel-bandwidth>100000000</channel-bandwidth>
+    <downlink-radio-frame-offset>0</downlink-radio-frame-offset>
+    <downlink-sfn-offset>0</downlink-sfn-offset>
+    <gain>10.5</gain>
+    <active>INACTIVE</active>
+    </tx-array-carriers>
+
+</user-plane-configuration>

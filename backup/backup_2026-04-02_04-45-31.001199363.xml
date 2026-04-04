@@ -1,0 +1,68 @@
+<keystore xmlns="urn:ietf:params:xml:ns:yang:ietf-keystore">
+  <asymmetric-keys>
+    <asymmetric-key>
+      <name>genkey</name>
+      <public-key-format xmlns:ct="urn:ietf:params:xml:ns:yang:ietf-crypto-types">ct:ssh-public-key-format</public-key-format>
+      <private-key-format xmlns:ct="urn:ietf:params:xml:ns:yang:ietf-crypto-types">ct:rsa-private-key-format</private-key-format>
+      <cleartext-private-key>MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQC7Srxnu1T7Rkwio3UZT8WYleyok09yoIqAhovxYFC9Rw9t6YeokwmpZ3x30/lzw15uHP2OZSv2sn8A3CNgEgUl2K5NGpoKM6KqjdYiBjDqW9j3ymz9WE8Zr6DAmpIxymM6Le5UbG1jjwfDlUsElKkyEZiV8KyIDwnwT0YsNEa2toP/z9MwzCP9fpEYlsDtsMzSqUxJlhfTTkM760ztFTEi+OV7du3qnwXsfaKHGNgmsDWd0HMlVe89+2ba59ZEVm9lkgS1MShd7KnzZfRsL6ZbaEN8N7nSrBHqp5TC7Dx6XF0Vx6lW3NhkjGlk4VJiBehw6uACSRV2NswvRu0CMNXTAgMBAAECggEAC9TQygy/dZAfRyDkSNENPnJaHNwRbMBPf4cAWCMpdouCogLamv+O4LC04Cz32SRCVtpl+hTSDieAdmFxqqP4x0dE24IOsQ5J/FQxbrzNYkCjGCQldmuZs5mwofohuht64TX9lD+1OVDTwLsxnfx2I7+Q0AgAHig1DIU1fZ1fyjLpuFDGStUAU2LSrFblNpyme8gC72w7/wjuy7pbfsd5B/CwH/SBrLC+b18ysGe5NsOxiFx0Lx0bXKZOYBSX3286XEDr28EfIzrrJkxwRdpmFBmmTmVfV9PJoARPovSxrCOZmZYKrOPYrboBCGfTL6aM9cfUVzKgA2Dbo/hwsjmYQQKBgQDmbcV6/Y8hc37/OxMWysokwuJSutcZfClxzGfmH7DcsEms2Z8g1q1tRlo7HTLR9Vxvebu4M5yvBeEWR4c6ZBiLWvRT0CsNWx9ZAiec6Trk23n7GWlHxIxbpMZRHmM2lupQNZTpuDvIGWZrQvTFla8JnYponNEFTuNenxCtED326wKBgQDQE35vOjUlo0eqpsEoMCRsrDDqwINrdr8MA9kHwJgJSsGFRM2PKwtfwMAXi+H3chMy9+5bvnGdmy8m397Bt7utaSU6YCPa7WdDgrToUBXnb596mAFKZ/aQMbm19eQBodIowI98aI1tMn7dlOKueCKkrfqtYJYKV0GuEZE7FK6yuQKBgQDcOMjllHM4exNChojl3YV3wLFgc6SjfKB3W+1oZ502LV0cTxff4Iv6xaPynyM0uhRPjb40e08hjrLiAhZhXcx/UrvzZh3fM9kvzflh4x0gIAniSxTtPBEQfNf0KuCTCYSCh9L709F+mZfipykbtMSGogPnmwfA1PZENi1P2Rf/ZQKBgQCGryeW7ZF7RF5eSsQatFbPdQHQ4j3u8JUnPNJdnz+KPDZZgjigZFdfao+sbiIdHlzpD+zcu8AlKU7zFdPFhp1X2Qh86cArtKGz5EYfXb9f6DPNkdi8BeFmYpl3+6rTl6BGOqZl+/MXbKkL2pSEJEUgXXE2ip90IBjmiH5+RJv0GQKBgQDX+WuDDDyK/0F2xXu2wGA7WOSYxsZVgv25SneyfsGCMrAEtgwzQmrTxwgcEI1zKI3G3PEnF2CVK/7nxGKPSdpr95IS/yfQ2Fc2ZC2s0A4UirAUGUYz0UwU+IDb+AuR8O+0W8ZHTOmy+MAFIEpTEWG52d1IfY6mfXZziIoh/M6dnA==</cleartext-private-key>
+    </asymmetric-key>
+  </asymmetric-keys>
+</keystore>
+<netconf-server xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-server">
+  <listen>
+    <endpoints>
+      <endpoint>
+        <name>default-ssh</name>
+        <ssh>
+          <tcp-server-parameters>
+            <local-bind>
+              <local-address>0.0.0.0</local-address>
+            </local-bind>
+          </tcp-server-parameters>
+          <ssh-server-parameters>
+            <server-identity>
+              <host-key>
+                <name>default-key</name>
+                <public-key>
+                  <central-keystore-reference>genkey</central-keystore-reference>
+                </public-key>
+              </host-key>
+              <banner xmlns="urn:cesnet:libnetconf2-netconf-server">netopeer2-netconf-server-2.7.3</banner>
+            </server-identity>
+            <client-authentication>
+              <users>
+                <user>
+                  <name>funtik22</name>
+                  <keyboard-interactive xmlns="urn:cesnet:libnetconf2-netconf-server">
+                    <use-system-auth/>
+                  </keyboard-interactive>
+                </user>
+              </users>
+            </client-authentication>
+          </ssh-server-parameters>
+        </ssh>
+      </endpoint>
+    </endpoints>
+  </listen>
+</netconf-server>
+<user-plane-configuration xmlns="urn:o-ran:uplane-conf:1.0">
+  <tx-array-carriers>
+    <name>carrier1</name>
+    <center-of-channel-bandwidth>3700000000</center-of-channel-bandwidth>
+    <channel-bandwidth>100000000</channel-bandwidth>
+    <active>INACTIVE</active>
+    <gain>10.5</gain>
+    <downlink-radio-frame-offset>0</downlink-radio-frame-offset>
+    <downlink-sfn-offset>0</downlink-sfn-offset>
+  </tx-array-carriers>
+  <rx-array-carriers>
+    <name>carrier1</name>
+    <center-of-channel-bandwidth>3700000000</center-of-channel-bandwidth>
+    <channel-bandwidth>100000000</channel-bandwidth>
+    <active>INACTIVE</active>
+    <downlink-radio-frame-offset>0</downlink-radio-frame-offset>
+    <downlink-sfn-offset>0</downlink-sfn-offset>
+    <gain-correction>-2.3</gain-correction>
+    <n-ta-offset>25600</n-ta-offset>
+  </rx-array-carriers>
+</user-plane-configuration>
