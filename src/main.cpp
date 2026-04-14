@@ -12,6 +12,9 @@
 #define TX_CARRIER "/o-ran-uplane-conf:user-plane-configuration/tx-array-carriers[name='carrier1']"
 
 int main() {
+
+
+    
     auto connection = std::make_shared<sysrepo::Connection>();
 
     auto configModule = std::make_unique<ConfigModule>(
@@ -20,6 +23,13 @@ int main() {
 
     configModule->initialize();
 
+    configModule->start();
+
+    std::cout << "Press Enter to stop...\n";
+    std::cin.get();
+
+    configModule->stop();
+/*
     Configuration configuration = configModule->getRunningConfig();
 
     std::cout << "+++++++++++++++++PRINT CONGIG++++++++++++++++++++++++++++++++"
@@ -82,7 +92,7 @@ int main() {
               << std::endl;
     std::cout << configuration << std::endl;
 
-/*
+
     Configuration newConfig;
 
     ConfigValue cv1;

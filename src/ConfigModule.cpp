@@ -81,7 +81,7 @@ void ConfigModule::initialize() {
             std::string("Failed to start sysrepo session: ") + ex.what());
     }
 
-    messageBus = std::make_unique<BaseMemory>("config_module");
+    messageBus = std::make_unique<BaseMemory>("/config_module");
     Result res = messageBus->createConnection();
     if (!res.result) {
         throw ConfigModuleException(
@@ -96,10 +96,27 @@ void ConfigModule::start(){
     if (currentState != ConfigModuleState::READY) {
         throw ConfigModuleException("Cannot start — module not initialized");
     }
+
+    if (listenerThread.joinable()) {
+        std::cout << "[ConfigModule] Warning: listener already running\n";
+        return;
+    }
+
+    listenerRunning = true;
+    listenerThread  = std::thread(&ConfigModule::listenerLoop, this);
+    isRunning       = true;
+
+    std::cout << "[ConfigModule] Started\n";
 }
 
 void ConfigModule::stop() {
+    listenerRunning = false;
+    if (listenerThread.joinable()) {
+        listenerThread.join();
+    }
 
+    isRunning = false;
+    std::cout << "[ConfigModule] Stopped\n";
     messageBus->deleteConnection();
 }
 
