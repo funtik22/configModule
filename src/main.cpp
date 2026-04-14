@@ -13,7 +13,6 @@
 
 int main() {
 
-
     
     auto connection = std::make_shared<sysrepo::Connection>();
 
@@ -23,9 +22,10 @@ int main() {
 
     configModule->initialize();
 
-    configModule->start();
+    std::cout << "Running... Press Ctrl+C to stop\n";
 
-    std::cout << "Press Enter to stop...\n";
+    configModule->start();
+    
     std::cin.get();
 
     configModule->stop();

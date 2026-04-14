@@ -105,8 +105,23 @@ void ConfigModule::start(){
     listenerRunning = true;
     listenerThread  = std::thread(&ConfigModule::listenerLoop, this);
     isRunning       = true;
-
+    //isRunning = true;
     std::cout << "[ConfigModule] Started\n";
+
+    // while (isRunning) {
+    //     while (messageBus && messageBus->hasMessage()) {
+    //         Message msg;
+    //         Result res = messageBus->getMessage(msg);
+
+    //         if (res.result) {
+    //             std::cout << "[ConfigModule] Received: "
+    //                       << msg.message << "\n";
+    //             handleConfigChange(msg.message);
+    //         }
+    //     }
+
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // }
 }
 
 void ConfigModule::stop() {
@@ -434,6 +449,7 @@ void ConfigModule::rotateBackups() {
 void ConfigModule::listenerLoop() {
     std::cout << "[ConfigModule] Listener thread started\n";
 
+    
     while (listenerRunning.load()) {
         if (messageBus && messageBus->hasMessage()) {
             Message msg;

@@ -18,6 +18,7 @@ add_executable(mplane_config_module
     libs/messageBus/SharedMemory/src/BaseMemory.cpp
 )
 
+
 target_include_directories(mplane_config_module
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/inc
@@ -31,6 +32,19 @@ target_link_libraries(mplane_config_module
         ${SYSREPO_CPP_LIBRARIES}
         ${LIBYANG_CPP_LIBRARIES}
 )
+
+
+add_executable(config_writer
+    src/writer.cpp
+    libs/messageBus/SharedMemory/src/BaseMemory.cpp
+)
+
+target_include_directories(config_writer
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/messageBus/SharedMemory/include/
+)
+
 
 target_compile_options(mplane_config_module PRIVATE
     -Wall
