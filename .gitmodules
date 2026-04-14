@@ -1,0 +1,3 @@
+[submodule "libs/messageBus"]
+	path = libs/messageBus
+	url = https://nnov.saas.sferaplatform.ru/app/sourcecode/api/M_Plane_Key/MessBus.git

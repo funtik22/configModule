@@ -14,11 +14,14 @@ add_executable(mplane_config_module
     src/ConfigModule.cpp
     src/ConfigTypes.cpp
     src/ConfigValidator.cpp
+
+    libs/messageBus/SharedMemory/src/BaseMemory.cpp
 )
 
 target_include_directories(mplane_config_module
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/inc
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/messageBus/SharedMemory/include/
         ${SYSREPO_CPP_INCLUDE_DIRS}
         ${LIBYANG_CPP_INCLUDE_DIRS}
 )

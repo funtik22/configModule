@@ -67,7 +67,7 @@ int main() {
 
     ConfigChange badChange;
     badChange.xpath    = TX_CARRIER "/gain";
-    badChange.newValue = double(50.0); // невалидное значение > 30 dB
+    badChange.newValue = double(50.0);
     badChange.oldValue = double(10.5);
 
     badRequest.changes.push_back(badChange);
@@ -82,6 +82,7 @@ int main() {
               << std::endl;
     std::cout << configuration << std::endl;
 
+/*
     Configuration newConfig;
 
     ConfigValue cv1;
@@ -106,4 +107,7 @@ int main() {
     std::cout << updatedConfig;
 
     std::cout << "GOOD" << std::endl;
+}
+*/
+
 }

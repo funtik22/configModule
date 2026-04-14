@@ -81,15 +81,26 @@ void ConfigModule::initialize() {
             std::string("Failed to start sysrepo session: ") + ex.what());
     }
 
+    messageBus = std::make_unique<BaseMemory>("config_module");
+    Result res = messageBus->createConnection();
+    if (!res.result) {
+        throw ConfigModuleException(
+            "Failed to create MessageBus connection: " + res.message);
+    }
+    messageBus->subscribeTag("tag1");
+    
     currentState = ConfigModuleState::READY;
 }
 
 void ConfigModule::start(){
-
+    if (currentState != ConfigModuleState::READY) {
+        throw ConfigModuleException("Cannot start — module not initialized");
+    }
 }
 
 void ConfigModule::stop() {
 
+    messageBus->deleteConnection();
 }
 
 std::string ConfigModule::getName() const {
@@ -339,33 +350,34 @@ void ConfigModule::tryRollbackViaBackup(const std::string &backupPath) {
     }
 }
 
-void ConfigModule::handleConfigChange(Configuration &newConfig) {
-    std::cout << "[ConfigModule] handleConfigChange received "
-              << newConfig.values.size() << " values\n";
+void ConfigModule::handleConfigChange(const std::string& message) {
+    std::cout << "[ConfigModule] handleConfigChange message: "
+              << message << "\n";
+
+    ConfigChange change;
+    try {
+        change = parseMessage(message);
+    } catch (const ConfigModuleException& ex) {
+        std::cout << "[ConfigModule] Failed to parse message: "
+                  << ex.what() << "\n";
+        return;
+    }
 
     Configuration currentConfig = getRunningConfig();
-
-    ConfigApplyRequest request;
-    std::string timestamp =
-        std::format("{:%Y-%m-%d_%H-%M-%S}", std::chrono::system_clock::now());
-    request.requestId = "auto-" + timestamp;
-    request.reason = "MessageBus notification";
-    request.rollbackOnFailure = true;
-
-    for (const auto &[xpath, cv] : newConfig.values) {
-        ConfigChange change;
-        change.xpath = xpath;
-        change.newValue = cv.value;
-
-        auto it = currentConfig.values.find(xpath);
-        if (it != currentConfig.values.end()) {
-            change.oldValue = it->second.value;
-        } else {
-            change.oldValue = std::nullopt;
-        }
-
-        request.changes.push_back(change);
+    auto it = currentConfig.values.find(change.xpath);
+    if (it != currentConfig.values.end()) {
+        change.oldValue = it->second.value;
+    } else {
+        change.oldValue = std::nullopt;
     }
+
+    // Формируем запрос
+    ConfigApplyRequest request;
+    request.requestId = "msg-" + std::format(
+        "{:%Y-%m-%d_%H-%M-%S}", std::chrono::system_clock::now());
+    request.reason            = "MessageBus notification";
+    request.rollbackOnFailure = true;
+    request.changes.push_back(change);
 
     const std::string result = applyConfiguration(request);
 
@@ -400,4 +412,64 @@ void ConfigModule::rotateBackups() {
 
     std::cout << "[ConfigModule] Backups: "
               << backups.size() << "/" << kMaxBackups << "\n";
+}
+
+void ConfigModule::listenerLoop() {
+    std::cout << "[ConfigModule] Listener thread started\n";
+
+    while (listenerRunning.load()) {
+        if (messageBus && messageBus->hasMessage()) {
+            Message msg;
+            Result res = messageBus->getMessage(msg);
+
+            if (res.result) {
+                std::cout << "[ConfigModule] Received message from="
+                          << msg.sender << " message=" << msg.message << "\n";
+                handleConfigChange(msg.message);
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    std::cout << "[ConfigModule] Listener thread stopped\n";
+}
+
+ConfigChange ConfigModule::parseMessage(const std::string& message) const {
+    ConfigChange change;
+
+    const size_t spacePos = message.find(' ');
+    if (spacePos == std::string::npos) {
+        throw ConfigModuleException(
+            "Invalid message format, expected 'xpath value': " + message);
+    }
+
+    change.xpath         = message.substr(0, spacePos);
+    const std::string valueStr = message.substr(spacePos + 1);
+
+    if (valueStr == "true" || valueStr == "false") {
+        change.newValue = (valueStr == "true");
+        return change;
+    }
+
+    try {
+        size_t pos = 0;
+        int64_t intVal = std::stoll(valueStr, &pos);
+        if (pos == valueStr.size()) {
+            change.newValue = intVal;
+            return change;
+        }
+    } catch (...) {}
+
+    try {
+        size_t pos = 0;
+        double dblVal = std::stod(valueStr, &pos);
+        if (pos == valueStr.size()) {
+            change.newValue = dblVal;
+            return change;
+        }
+    } catch (...) {}
+
+    change.newValue = valueStr;
+    return change;
 }
