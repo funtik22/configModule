@@ -14,10 +14,7 @@
  */
 struct ConfigValue {
     std::string xpath;                                          ///< YANG xpath path
-    std::string yangModule;                                     ///< YANG module name
     std::variant<std::string, int64_t, double, bool> value;    ///< Actual value
-    std::chrono::system_clock::time_point createdTime;         ///< Creation timestamp
-    std::chrono::system_clock::time_point modifiedTime;        ///< Last modification timestamp
 };
 
 /**

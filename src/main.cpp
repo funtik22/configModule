@@ -20,7 +20,18 @@ int main() {
         BACKUP_DIRECTORY, std::chrono::seconds(TRANSACTION_TIMEOUT),
         connection);
 
+
     configModule->initialize();
+
+    Configuration configuration = configModule->getRunningConfig();
+
+    
+    std::cout << "+++++++++++++++++PRINT CONGIG++++++++++++++++++++++++++++++++"
+              << std::endl;
+    std::cout << configuration << std::endl;
+
+    configModule->createBackup();
+/*
 
     std::cout << "Running... Press Ctrl+C to stop\n";
 
@@ -29,7 +40,7 @@ int main() {
     std::cin.get();
 
     configModule->stop();
-/*
+    
     Configuration configuration = configModule->getRunningConfig();
 
     std::cout << "+++++++++++++++++PRINT CONGIG++++++++++++++++++++++++++++++++"

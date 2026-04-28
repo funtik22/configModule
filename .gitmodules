@@ -2,3 +2,6 @@
 	path = libs/messageBus
 	url = https://nnov.saas.sferaplatform.ru/app/sourcecode/api/M_Plane_Key/MessBus.git
 	branch = main
+[submodule "libs/baseModule"]
+	path = libs/baseModule
+	url = https://nnov.saas.sferaplatform.ru/app/sourcecode/api/M_Plane_Key/BaseModule.git

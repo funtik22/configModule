@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(PkgConfig REQUIRED)
+find_package(nlohmann_json 3.2.0 REQUIRED)
 
 pkg_check_modules(SYSREPO_CPP REQUIRED sysrepo-cpp)
 pkg_check_modules(LIBYANG_CPP REQUIRED libyang-cpp)
@@ -14,6 +15,7 @@ add_executable(mplane_config_module
     src/ConfigModule.cpp
     src/ConfigTypes.cpp
     src/ConfigValidator.cpp
+    src/HardwareEmulator.cpp
 
     libs/messageBus/SharedMemory/src/BaseMemory.cpp
 )
@@ -23,6 +25,7 @@ target_include_directories(mplane_config_module
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/inc
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/messageBus/SharedMemory/include/
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/baseModule/
         ${SYSREPO_CPP_INCLUDE_DIRS}
         ${LIBYANG_CPP_INCLUDE_DIRS}
 )
@@ -31,7 +34,8 @@ target_link_libraries(mplane_config_module
     PRIVATE
         ${SYSREPO_CPP_LIBRARIES}
         ${LIBYANG_CPP_LIBRARIES}
-)
+        nlohmann_json::nlohmann_json
+)   
 
 
 add_executable(config_writer

@@ -12,37 +12,37 @@ const std::set<int64_t> ConfigValidator::kAllowedNumerologies = {
     0, 1, 2, 3, 4
 };
 
+bool ConfigValidator::validate(const std::string& xpath,
+                                const Value& value) const {
+  
+    if (xpath.find("center-of-channel-bandwidth") != std::string::npos) {
+        return validateCenterOfChannelBandwidth(value);
+    }
+    if (xpath.find("channel-bandwidth") != std::string::npos) {
+        return validateChannelBandwidth(value);
+    }
+    if (xpath.find("numerology") != std::string::npos) {
+        return validateNumerology(value);
+    }
+    if (xpath.find("tx-array-carriers") != std::string::npos
+        && xpath.find("/gain") != std::string::npos
+        && xpath.find("gain-correction") == std::string::npos) {
+        return validateTxGain(value);
+    }
+    if (xpath.find("rx-array-carriers") != std::string::npos
+        && xpath.find("gain-correction") != std::string::npos) {
+        return validateRxGainCorrection(value);
+    }
+
+    return true;
+}
+
 bool ConfigValidator::validate(const ConfigApplyRequest& request) const {
     std::cout << "[ConfigValidator] Validating requestId="
               << request.requestId << "\n";
 
     for (const auto& change : request.changes) {
-        bool valid = true;
-
-        if (change.xpath.find("center-of-channel-bandwidth")
-            != std::string::npos) {
-            valid = validateCenterOfChannelBandwidth(change.newValue);
-
-        } else if (change.xpath.find("channel-bandwidth")
-                   != std::string::npos) {
-            valid = validateChannelBandwidth(change.newValue);
-
-        } else if (change.xpath.find("numerology") != std::string::npos) {
-            valid = validateNumerology(change.newValue);
-
-        } else if (change.xpath.find("tx-array-carriers") != std::string::npos
-                   && change.xpath.find("/gain") != std::string::npos
-                   && change.xpath.find("gain-correction")
-                          == std::string::npos) {
-            valid = validateTxGain(change.newValue);
-
-        } else if (change.xpath.find("rx-array-carriers") != std::string::npos
-                   && change.xpath.find("gain-correction")
-                          != std::string::npos) {
-            valid = validateRxGainCorrection(change.newValue);
-        }
-
-        if (!valid) {
+        if (!validate(change.xpath, change.newValue)) {
             std::cout << "[ConfigValidator] FAILED xpath=" << change.xpath
                       << "\n";
             return false;

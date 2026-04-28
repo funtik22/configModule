@@ -6,9 +6,7 @@
 #include <string>
 
 class ConfigValidator {
-public:
-    ConfigValidator() = default;
-    bool validate(const ConfigApplyRequest& request) const;
+
 
 private:
     using Value = std::variant<std::string, int64_t, double, bool>;
@@ -34,4 +32,10 @@ private:
 
     static const std::set<int64_t> kAllowedBandwidthsMHz;
     static const std::set<int64_t> kAllowedNumerologies;
+
+
+public:
+    ConfigValidator() = default;
+    bool validate(const ConfigApplyRequest& request) const;
+    bool validate(const std::string& xpath, const Value& value) const;
 };

@@ -3,8 +3,9 @@
 
 #include "ConfigTypes.hpp"
 #include "ConfigValidator.hpp"
-#include "ModuleBase.hpp"
+#include "BaseModule.hpp"
 #include "BaseMemory.hpp"
+#include "HardwareEmulator.hpp"
 
 #include <sysrepo-cpp/Subscription.hpp>
 
@@ -12,7 +13,10 @@
 #include <thread>
 #include <atomic>
 
-class ConfigModule : public ModuleBase {
+#define SUBSCRIBE_TO_TAG "config_changes"
+#define MESSAGE_BUS_NAME "/config_module"
+
+class ConfigModule : public BaseModule {
     public:
         
         explicit ConfigModule(
@@ -26,8 +30,6 @@ class ConfigModule : public ModuleBase {
         void initialize() override;
         void start() override;
         void stop() override;
-        std::string getName() const override;
-        std::string getStatus() const override;
 
         std::string applyConfiguration(ConfigApplyRequest& request);
         Configuration getRunningConfig() const;
@@ -52,7 +54,10 @@ class ConfigModule : public ModuleBase {
         std::chrono::system_clock::time_point         lastConfigChange;
         static constexpr size_t kMaxBackups = 10;
 
+        std::unique_ptr<HardwareEmulator>    hardwareEmulator;
+
         bool validateConfiguration(ConfigApplyRequest& request);
+        void loadConfigFromSysrepo();
         bool tryRollbackViaOldValue(const ConfigApplyRequest& request); 
         void tryRollbackViaBackup(const std::string& backupPath);
         void rotateBackups();

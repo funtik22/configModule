@@ -27,8 +27,7 @@ std::ostream& operator<<(std::ostream& os, const Configuration& cfg) {
             if constexpr (std::is_same_v<T, double>)        return "double";
             if constexpr (std::is_same_v<T, bool>)          return "bool";
         }, cv.value);
-        os << "  module : " << cv.yangModule << "\n" 
-           << "  xpath  : " << xpath << "\n"
+        os << "  xpath  : " << xpath << "\n"
            << "  type   : " << typeName << "\n"
            << "  value  : " << configValueToString(cv.value) << "\n\n";
     }
