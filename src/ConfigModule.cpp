@@ -57,7 +57,13 @@ nlohmann::json valueToJson(const ParamValue& v) {
     }, v);
 }
 
-
+std::variant<std::string, int64_t, double, bool> jsonToValue(const nlohmann::json& j, const std::string& type) {
+    if (type == "string") return j.get<std::string>();
+    if (type == "int64")  return j.get<int64_t>();
+    if (type == "double") return j.get<double>();
+    if (type == "bool")   return j.get<bool>();
+    throw ConfigModuleException("jsonToValue: unknown valueType '" + type + "'");
+}
 
 }  // namespace
 
@@ -70,6 +76,7 @@ ConfigModule::ConfigModule(std::string backupDirectory_,
       validator(std::make_unique<ConfigValidator>()),
       currentState(ConfigModuleState::UNINITIALIZED),
       lastConfigChange(std::chrono::system_clock::now()) {
+    setName("ConfigModule");
     if (backupDirectory.empty()) {
         throw ConfigModuleException("backupDirectory cannot be empty");
     }
@@ -119,27 +126,39 @@ void ConfigModule::initialize() {
 
     loadConfigFromSysrepo();
 
+    currentState = ConfigModuleState::VALIDATING_CONFIGURATION;
+    const auto allParams = hardwareEmulator->getAllParameters();
+    for (const auto& [id, param] : allParams) {
+        if (!validator->validate(id, param.value)) {
+            currentState = ConfigModuleState::CRASHED;
+            throw ConfigModuleException(
+                "Initial config validation failed for: " + id);
+        }
+    }
+
     currentState = ConfigModuleState::READY;
+    publishLogInfo("Initialized");
 }
 
-void ConfigModule::start(){
+void ConfigModule::start() {
     if (currentState != ConfigModuleState::READY) {
         throw ConfigModuleException("Cannot start — module not initialized");
     }
 
+    listenerRunning = true;
+    listenerThread  = std::thread(&ConfigModule::listenerLoop, this);
 
-
-    currentState   = ConfigModuleState::READY;
+    publishLogInfo("Started");
 }
 
 void ConfigModule::stop() {
-    // listenerRunning = false;
-    // if (listenerThread.joinable()) {
-    //     listenerThread.join();
-    // }
+    listenerRunning = false;
+    if (listenerThread.joinable()) {
+        listenerThread.join();
+    }
 
-    // isRunning = false;
     messageBus->deleteConnection();
+    publishLogInfo("Stopped");
 }
 
 
@@ -147,8 +166,6 @@ Configuration ConfigModule::getRunningConfig() const {
     if (currentState != ConfigModuleState::READY) {
         throw ConfigModuleException("ConfigModule is not ready");
     }
-
-    std::cout << "[ConfigModule] Reading running config from sysrepo...\n";
 
     Configuration config;
 
@@ -161,7 +178,7 @@ Configuration ConfigModule::getRunningConfig() const {
         config.values.emplace(id, std::move(cv));
     }
 
-    std::cout << "[ConfigModule] Read " << config.values.size() << " values\n";
+    publishLogInfo("Read " + std::to_string(config.values.size()) + " values from running config");
     return config;
 }
 
@@ -172,7 +189,7 @@ std::string ConfigModule::createBackup() {
     j["createdAt"]  = std::chrono::duration_cast<std::chrono::milliseconds>(
                           std::chrono::system_clock::now().time_since_epoch()).count();
     j["parameters"] = nlohmann::json::array();
-    
+
     const Configuration snapshot = getRunningConfig();
 
     try {
@@ -184,12 +201,10 @@ std::string ConfigModule::createBackup() {
             j["parameters"].push_back(std::move(pj));
         }
     } catch (const std::exception& e) {
-    
-    
     }
 
     currentState = ConfigModuleState::CREATING_BACKUP;
-    std::cout << "[ConfigModule] Creating backup...\n";
+    publishLogInfo("Creating backup");
 
     auto now = std::chrono::system_clock::now();
     std::string timestamp = std::format("{:%Y-%m-%d_%H-%M-%S}", now);
@@ -234,68 +249,76 @@ void ConfigModule::loadConfigFromSysrepo() {
 }
 
 bool ConfigModule::restoreFromBackup(std::string backupPath) {
-    // currentState = ConfigModuleState::RESTORING_FROM_BACKUP;
-    // std::cout << "[ConfigModule] Restoring from backup: " << backupPath << "\n";
+    currentState = ConfigModuleState::RESTORING_FROM_BACKUP;
+    publishLogInfo("Restoring from backup: " + backupPath);
 
-    // const std::string backupFilename = backupDirectory + "/" + backupPath;
+    std::filesystem::path fullPath = std::filesystem::path(backupDirectory) / backupPath;
 
-    // if (!std::filesystem::exists(backupFilename)) {
-    //     std::cout << "[ConfigModule] Backup file not found: " << backupFilename
-    //               << "\n";
-    //     currentState = ConfigModuleState::READY;
-    //     return false;
-    // }
+    if (!std::filesystem::exists(fullPath)) {
+        publishLogWarning("Backup file not found: " + fullPath.string());
+        currentState = ConfigModuleState::READY;
+        return false;
+    }
 
-    // try {
-    //     auto ctx = runningSession->getContext();
+    nlohmann::json j;
+    try {
+        std::ifstream ifs(fullPath);
+        if (!ifs) {
+            publishLogError("Cannot open backup file: " + fullPath.string());
+            currentState = ConfigModuleState::READY;
+            return false;
+        }
+        ifs >> j;
+    } catch (const std::exception& e) {
+        publishLogError("Failed to parse backup JSON: " + std::string(e.what()));
+        currentState = ConfigModuleState::READY;
+        return false;
+    }
 
-    //     auto data = ctx.parseData(std::filesystem::path(backupFilename),
-    //                               libyang::DataFormat::XML,
-    //                               libyang::ParseOptions::ParseOnly);
 
-    //     if (!data) {
-    //         throw ConfigModuleException("Failed to parse backup file: " +
-    //                                     backupFilename);
-    //     }
+    std::map<std::string, ParamValue> restored;
+    try {
+        for (const auto& pj : j["parameters"]) {
+            const auto id        = pj.at("id").get<std::string>();
+            const auto valueType = pj.at("valueType").get<std::string>();
+            const auto value     = jsonToValue(pj.at("value"), valueType);
+            restored.emplace(id, std::move(value));
+        }
+    } catch (const std::exception& e) {
+        publishLogError("Malformed backup entry: " + std::string(e.what()));
+        currentState = ConfigModuleState::READY;
+        return false;
+    }
 
-    //     runningSession->replaceConfig(data, std::nullopt);
 
-    //     lastConfigChange = std::chrono::system_clock::now();
-    //     currentState = ConfigModuleState::READY;
+    hardwareEmulator->clear();
+    for (const auto& [id, value] : restored) {
+        hardwareEmulator->setParameter(id, value);
+    }
 
-    //     std::cout << "[ConfigModule] Restore completed successfully\n";
-    //     return true;
+    lastConfigChange = std::chrono::system_clock::now();
+    publishLogInfo("Restored " + std::to_string(restored.size()) + " parameters from backup");
 
-    // } catch (const ConfigModuleException &) {
-    //     currentState = ConfigModuleState::READY;
-    //     throw;
-    // } catch (const std::exception &ex) {
-    //     currentState = ConfigModuleState::READY;
-    //     throw ConfigModuleException(
-    //         std::string("Failed to restore from backup: ") + ex.what());
-    // }
+    currentState = ConfigModuleState::READY;
+    return true;
 }
 
-std::string ConfigModule::applyConfiguration(ConfigApplyRequest &request) {
 
-    
+std::string ConfigModule::applyConfiguration(ConfigApplyRequest &request) {
     if (currentState != ConfigModuleState::READY) {
         throw ConfigModuleException("ConfigModule is not ready");
     }
 
-    std::cout << "[ConfigModule] Applying configuration requestId="
-              << request.requestId << "\n";
+    publishLogInfo("Applying configuration requestId=" + request.requestId);
 
-    // ConfigValidator configValidator = ConfigValidator();
-    // currentState = ConfigModuleState::VALIDATING_CONFIGURATION;
-    // if (!configValidator.validate(request)) {
-    //     currentState = ConfigModuleState::VALIDATION_ERROR;
-    //     std::cout << "[ConfigModule] Validation failed for requestId="
-    //             << request.requestId << "\n";
-    //     currentState = ConfigModuleState::READY;
-    //     return {};
-    // }
-
+    currentState = ConfigModuleState::VALIDATING_CONFIGURATION;
+    if (!validator->validate(request)) {
+        currentState = ConfigModuleState::VALIDATION_ERROR;
+        publishLogError("Validation failed for requestId=" + request.requestId);
+        currentState = ConfigModuleState::READY;
+        return {};
+    }
+    currentState = ConfigModuleState::READY;
     for (auto& ch : request.changes) {
         if (auto p = hardwareEmulator->getParameter(ch.xpath)) {
             ch.oldValue = p->value;
@@ -304,222 +327,193 @@ std::string ConfigModule::applyConfiguration(ConfigApplyRequest &request) {
         }
     }
 
-    currentState = ConfigModuleState::APPLYING_CONFIGURATION;
-
-    for (const auto& ch : request.changes) {
-        const bool ok = hardwareEmulator->setParameter(ch.xpath, ch.newValue);
+    std::string backupPath;
+    try {
+        backupPath = createBackup();
+    } catch (const std::exception& ex) {
+        publishLogWarning("Failed to create backup: " + std::string(ex.what()));
     }
 
+    currentState = ConfigModuleState::APPLYING_CONFIGURATION;
 
+    try {
+        for (const auto& ch : request.changes) {
+            if (!hardwareEmulator->setParameter(ch.xpath, ch.newValue)) {
+                throw ConfigModuleException(
+                    "setParameter failed for xpath: " + ch.xpath);
+            }
+        }
 
+        lastConfigChange = std::chrono::system_clock::now();
+        currentState = ConfigModuleState::READY;
 
+        publishLogInfo("Applied successfully requestId=" + request.requestId);
+        return request.requestId;
 
-    // std::string backupPath;
-    // try {
-    //     backupPath = createBackup();
-    // } catch (const std::exception &ex) {
-    //     std::cout << "[ConfigModule] Warning: failed to create backup: "
-    //               << ex.what() << "\n";
-    // }
+    } catch (const std::exception& ex) {
+        currentState = ConfigModuleState::CONFIGURATION_ERROR;
+        publishLogError("Failed to apply: " + std::string(ex.what()));
 
-    // currentState = ConfigModuleState::APPLYING_CONFIGURATION;
-    // try {
-    //     for (const auto &change : request.changes) {
-    //         const std::string value = configValueToString(change.newValue);
+        if (request.rollbackOnFailure) {
+            if (!tryRollbackViaOldValue(request)) {
+                tryRollbackViaBackup(backupPath);
+            }
+        }
 
-    //         std::cout << "[ConfigModule] Setting xpath=" << change.xpath
-    //                   << " value=" << value << "\n";
-
-    //         runningSession->setItem(change.xpath, value);
-    //     }
-
-    //     runningSession->applyChanges();
-
-    //     lastConfigChange = std::chrono::system_clock::now();
-    //     currentState = ConfigModuleState::READY;
-
-    //     std::cout << "[ConfigModule] Applied successfully requestId="
-    //               << request.requestId << "\n";
-    //     return request.requestId;
-
-    // } catch (const std::exception &ex) {
-    //     currentState = ConfigModuleState::CONFIGURATION_ERROR;
-    //     std::cout << "[ConfigModule] Failed to apply: " << ex.what() << "\n";
-
-    //     if (request.rollbackOnFailure) {
-    //         if (!tryRollbackViaOldValue(request)) {
-    //             tryRollbackViaBackup(backupPath);
-    //         }
-    //     }
-
-    //     currentState = ConfigModuleState::READY;
-    //     return {};
-    // }
+        currentState = ConfigModuleState::READY;
+        return {};
+    }
 }
 
-bool ConfigModule::tryRollbackViaOldValue(const ConfigApplyRequest &request) {
-    // try {
-    //     for (const auto &change : request.changes) {
-    //         if (!change.oldValue.has_value()) {
-    //             std::cout << "[ConfigModule] Deleting xpath=" << change.xpath
-    //                       << "\n";
-    //             runningSession->deleteItem(change.xpath);
-    //         } else {
-    //             std::cout << "[ConfigModule] Restoring xpath=" << change.xpath
-    //                       << "\n";
-    //             runningSession->setItem(
-    //                 change.xpath, configValueToString(*change.oldValue));
-    //         }
-    //     }
-    //     runningSession->applyChanges();
-    //     std::cout << "[ConfigModule] Rollback via oldValue successful\n";
-    //     return true;
 
-    // } catch (const std::exception &ex) {
-    //     std::cout << "[ConfigModule] oldValue rollback failed: " << ex.what()
-    //               << "\n";
-    //     return false;
-    // }
+bool ConfigModule::tryRollbackViaOldValue(const ConfigApplyRequest &request) {
+    try {
+        for (const auto& ch : request.changes) {
+            if (!ch.oldValue.has_value()) {
+                hardwareEmulator->removeParameter(ch.xpath);
+            } else {
+                hardwareEmulator->setParameter(ch.xpath, *ch.oldValue);
+            }
+        }
+        publishLogInfo("Rollback via oldValue successful");
+        return true;
+    } catch (const std::exception& ex) {
+        publishLogError("oldValue rollback failed: " + std::string(ex.what()));
+        return false;
+    }
 }
 
 void ConfigModule::tryRollbackViaBackup(const std::string &backupPath) {
-    // if (backupPath.empty()) {
-    //     currentState = ConfigModuleState::CRASHED;
-    //     throw ConfigModuleException("Rollback failed and no backup available");
-    // }
+    if (backupPath.empty()) {
+        currentState = ConfigModuleState::CRASHED;
+        throw ConfigModuleException("Rollback failed and no backup available");
+    }
 
-    // std::cout << "[ConfigModule] Trying backup restore: " << backupPath << "\n";
-    // try {
-    //     restoreFromBackup(backupPath);
-    //     std::cout << "[ConfigModule] Restore from backup successful\n";
-    // } catch (const std::exception &ex) {
-    //     currentState = ConfigModuleState::CRASHED;
-    //     throw ConfigModuleException(
-    //         std::string("Both rollback and restore failed: ") + ex.what());
-    // }
+    publishLogInfo("Trying backup restore: " + backupPath);
+
+    if (!restoreFromBackup(backupPath)) {
+        currentState = ConfigModuleState::CRASHED;
+        throw ConfigModuleException("Restore from backup failed: " + backupPath);
+    }
+
+    publishLogInfo("Restore from backup successful");
 }
 
 void ConfigModule::handleConfigChange(const std::string& message) {
-    // std::cout << "[ConfigModule] handleConfigChange message: "
-    //           << message << "\n";
+    publishLogInfo("handleConfigChange message: " + message);
 
-    // ConfigChange change;
-    // try {
-    //     change = parseMessage(message);
-    // } catch (const ConfigModuleException& ex) {
-    //     std::cout << "[ConfigModule] Failed to parse message: "
-    //               << ex.what() << "\n";
-    //     return;
-    // }
+    ConfigChange change;
+    try {
+        change = parseMessage(message);
+    } catch (const ConfigModuleException& ex) {
+        publishLogError("Failed to parse message: " + std::string(ex.what()));
+        return;
+    }
 
-    // Configuration currentConfig = getRunningConfig();
-    // auto it = currentConfig.values.find(change.xpath);
-    // if (it != currentConfig.values.end()) {
-    //     change.oldValue = it->second.value;
-    // } else {
-    //     change.oldValue = std::nullopt;
-    // }
+    ConfigApplyRequest request;
+    request.requestId = "msg-" + std::format(
+        "{:%Y-%m-%d_%H-%M-%S}", std::chrono::system_clock::now());
+    request.reason            = "MessageBus notification";
+    request.rollbackOnFailure = true;
+    request.changes.push_back(std::move(change));
 
-    // // Формируем запрос
-    // ConfigApplyRequest request;
-    // request.requestId = "msg-" + std::format(
-    //     "{:%Y-%m-%d_%H-%M-%S}", std::chrono::system_clock::now());
-    // request.reason            = "MessageBus notification";
-    // request.rollbackOnFailure = true;
-    // request.changes.push_back(change);
+    const std::string result = applyConfiguration(request);
 
-    // const std::string result = applyConfiguration(request);
-
-    // if (!result.empty()) {
-    //     std::cout << "[ConfigModule] handleConfigChange applied successfully "
-    //               << "requestId=" << result << "\n";
-    // } else {
-    //     std::cout << "[ConfigModule] handleConfigChange failed\n";
-    // }
+    if (!result.empty()) {
+        publishLogInfo("handleConfigChange applied successfully requestId=" + result);
+    } else {
+        publishLogError("handleConfigChange failed");
+    }
 }
 
 
 void ConfigModule::rotateBackups() {
-    // std::vector<std::filesystem::path> backups;
+    std::vector<std::filesystem::path> backups;
 
-    // for (const auto& entry :
-    //      std::filesystem::directory_iterator(backupDirectory)) {
-    //     if (entry.path().extension() == ".xml" &&
-    //         entry.path().filename().string().starts_with("backup_")) {
-    //         backups.push_back(entry.path());
-    //     }
-    // }
+    for (const auto& entry :
+         std::filesystem::directory_iterator(backupDirectory)) {
+        if (entry.path().extension() == ".json" &&
+            entry.path().filename().string().rfind("backup_", 0) == 0) {
+            backups.push_back(entry.path());
+        }
+    }
 
-    // std::sort(backups.begin(), backups.end());
+    std::sort(backups.begin(), backups.end());
 
-    // while (backups.size() > kMaxBackups) {
-    //     std::cout << "[ConfigModule] Removing old backup: "
-    //               << backups.front() << "\n";
-    //     std::filesystem::remove(backups.front());
-    //     backups.erase(backups.begin());
-    // }
+    while (backups.size() > kMaxBackups) {
+        publishLogInfo("Removing old backup: " + backups.front().string());
+        std::filesystem::remove(backups.front());
+        backups.erase(backups.begin());
+    }
 
-    // std::cout << "[ConfigModule] Backups: "
-    //           << backups.size() << "/" << kMaxBackups << "\n";
+    publishLogInfo("Backups: " + std::to_string(backups.size()) + "/" + std::to_string(kMaxBackups));
 }
 
 void ConfigModule::listenerLoop() {
-    // std::cout << "[ConfigModule] Listener thread started\n";
+    publishLogInfo("Listener thread started");
 
-    
-    // while (listenerRunning.load()) {
-    //     if (messageBus && messageBus->hasMessage()) {
-    //         Message msg;
-    //         Result res = messageBus->getMessage(msg);
+    while (listenerRunning.load()) {
+        if (messageBus && messageBus->hasMessage()) {
+            Message msg;
+            const Result res = messageBus->getMessage(msg);
 
-    //         if (res.result) {
-    //             std::cout << "[ConfigModule] Received message from="
-    //                       << msg.sender << " message=" << msg.message << "\n";
-    //             handleConfigChange(msg.message);
-    //         }
-    //     }
+            if (res.result) {
+                publishLogInfo("Received message from=" + msg.sender + " message=" + msg.message);
+                try {
+                    handleConfigChange(msg.message);
+                } catch (const std::exception& ex) {
+                    publishLogError("handleConfigChange exception: " + std::string(ex.what()));
+                }
+            } else {
+                publishLogError("getMessage failed: " + res.message);
+            }
+        }
 
-    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    // }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
 
-    // std::cout << "[ConfigModule] Listener thread stopped\n";
+    publishLogInfo("Listener thread stopped");
 }
 
 ConfigChange ConfigModule::parseMessage(const std::string& message) const {
-    // ConfigChange change;
+    const size_t spacePos = message.find(' ');
+    if (spacePos == std::string::npos) {
+        throw ConfigModuleException(
+            "Invalid message format, expected 'xpath value': " + message);
+    }
 
-    // const size_t spacePos = message.find(' ');
-    // if (spacePos == std::string::npos) {
-    //     throw ConfigModuleException(
-    //         "Invalid message format, expected 'xpath value': " + message);
-    // }
+    ConfigChange change;
+    change.xpath = message.substr(0, spacePos);
+    const std::string valueStr = message.substr(spacePos + 1);
 
-    // change.xpath         = message.substr(0, spacePos);
-    // const std::string valueStr = message.substr(spacePos + 1);
+    if (valueStr == "true" || valueStr == "false") {
+        change.newValue = (valueStr == "true");
+        return change;
+    }
 
-    // if (valueStr == "true" || valueStr == "false") {
-    //     change.newValue = (valueStr == "true");
-    //     return change;
-    // }
+    try {
+        size_t pos = 0;
+        const int64_t intVal = std::stoll(valueStr, &pos);
+        if (pos == valueStr.size()) {
+            change.newValue = intVal;
+            return change;
+        }
+    } catch (...) {}
 
-    // try {
-    //     size_t pos = 0;
-    //     int64_t intVal = std::stoll(valueStr, &pos);
-    //     if (pos == valueStr.size()) {
-    //         change.newValue = intVal;
-    //         return change;
-    //     }
-    // } catch (...) {}
+    try {
+        size_t pos = 0;
+        const double dblVal = std::stod(valueStr, &pos);
+        if (pos == valueStr.size()) {
+            change.newValue = dblVal;
+            return change;
+        }
+    } catch (...) {}
 
-    // try {
-    //     size_t pos = 0;
-    //     double dblVal = std::stod(valueStr, &pos);
-    //     if (pos == valueStr.size()) {
-    //         change.newValue = dblVal;
-    //         return change;
-    //     }
-    // } catch (...) {}
+    change.newValue = valueStr;
+    return change;
+}
 
-    // change.newValue = valueStr;
-    // return change;
+void ConfigModule::publishLog(const std::string& tag, const std::string& text) const {
+    if (!messageBus) return;
+    messageBus->publishMessage("[" + getName() + "] " + text, tag);
 }

@@ -43,7 +43,7 @@ int main() {
     for (const auto& msg : messages) {
         cout << "Sending message #" << (count + 1) << ":\n  " << msg << "\n";
 
-        res = writer.publishMessage(msg, {"tag1"});
+        res = writer.publishMessage(msg, {"config_changes"});
         if (res.result) {
             cout << "  → Sent successfully\n";
             count++;

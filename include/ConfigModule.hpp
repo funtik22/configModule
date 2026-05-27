@@ -64,4 +64,9 @@ class ConfigModule : public BaseModule {
 
         void listenerLoop();
         ConfigChange parseMessage(const std::string& message) const;
+
+        void publishLog(const std::string& tag, const std::string& text) const;
+        void publishLogInfo   (const std::string& t) const { publishLog("log_info",    t); }
+        void publishLogWarning(const std::string& t) const { publishLog("log_warning", t); }
+        void publishLogError  (const std::string& t) const { publishLog("log_error",   t); }
 };

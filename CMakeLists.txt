@@ -11,7 +11,7 @@ pkg_check_modules(SYSREPO_CPP REQUIRED sysrepo-cpp)
 pkg_check_modules(LIBYANG_CPP REQUIRED libyang-cpp)
 
 add_executable(mplane_config_module
-    src/main.cpp
+    execute/main.cpp
     src/ConfigModule.cpp
     src/ConfigTypes.cpp
     src/ConfigValidator.cpp
@@ -23,7 +23,7 @@ add_executable(mplane_config_module
 
 target_include_directories(mplane_config_module
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/messageBus/SharedMemory/include/
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/baseModule/
         ${SYSREPO_CPP_INCLUDE_DIRS}
@@ -45,7 +45,7 @@ add_executable(config_writer
 
 target_include_directories(config_writer
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/messageBus/SharedMemory/include/
 )
 

@@ -8,21 +8,13 @@ const std::set<int64_t> ConfigValidator::kAllowedBandwidthsMHz = {
     5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100
 };
 
-const std::set<int64_t> ConfigValidator::kAllowedNumerologies = {
-    0, 1, 2, 3, 4
-};
-
 bool ConfigValidator::validate(const std::string& xpath,
-                                const Value& value) const {
-  
+                               const Value& value) const {
     if (xpath.find("center-of-channel-bandwidth") != std::string::npos) {
         return validateCenterOfChannelBandwidth(value);
     }
     if (xpath.find("channel-bandwidth") != std::string::npos) {
         return validateChannelBandwidth(value);
-    }
-    if (xpath.find("numerology") != std::string::npos) {
-        return validateNumerology(value);
     }
     if (xpath.find("tx-array-carriers") != std::string::npos
         && xpath.find("/gain") != std::string::npos
@@ -101,23 +93,6 @@ bool ConfigValidator::validateChannelBandwidth(const Value& value) const {
         std::cout << "[ConfigValidator] channel-bandwidth=" << bwMHz
                   << " MHz not in allowed set "
                      "{5,10,15,20,25,30,40,50,60,70,80,90,100}\n";
-        return false;
-    }
-
-    return true;
-}
-
-bool ConfigValidator::validateNumerology(const Value& value) const {
-    if (!std::holds_alternative<int64_t>(value)) {
-        std::cout << "[ConfigValidator] numerology: expected int64_t\n";
-        return false;
-    }
-
-    int64_t num = std::get<int64_t>(value);
-
-    if (kAllowedNumerologies.find(num) == kAllowedNumerologies.end()) {
-        std::cout << "[ConfigValidator] numerology=" << num
-                  << " not in allowed set {0,1,2,3,4}\n";
         return false;
     }
 

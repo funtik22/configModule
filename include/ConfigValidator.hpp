@@ -13,7 +13,6 @@ private:
 
     bool validateCenterOfChannelBandwidth(const Value& value) const;
     bool validateChannelBandwidth(const Value& value) const;
-    bool validateNumerology(const Value& value) const;
     bool validateTxGain(const Value& value) const;
     bool validateRxGainCorrection(const Value& value) const;
 
@@ -31,7 +30,6 @@ private:
     static constexpr double kRxGainMaxDb = 20.0;
 
     static const std::set<int64_t> kAllowedBandwidthsMHz;
-    static const std::set<int64_t> kAllowedNumerologies;
 
 
 public:
